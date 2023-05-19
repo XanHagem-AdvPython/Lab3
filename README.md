@@ -19,8 +19,8 @@ This module has 2 distinct parts: A and B.
 Only one part will run at a time.
 
 Here's a diagram: 
-webpage ===> Part A ===> JSON file
-JSON file ===> Part B ===> SQL Database
+webpage ===> Part A ===> JSON file  
+JSON file ===> Part B ===> SQL Database  
 
 ---
 ## Part A
