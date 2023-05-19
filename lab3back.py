@@ -35,14 +35,17 @@ PART B: Data Storage
 
 """
 
+import urllib.request as ur
 import requests
 from bs4 import BeautifulSoup
 import json
+import re
 import sqlite3
 
-def fetch_restaurant_data(url):
+
+def fetch_restaurants_directory_data(url):
     """
-    Fetch data from page: use use requests.get() to fetch the page content, 
+    Fetch data from page: use use requests.get() to fetch the page content,
     and then use BeautifulSoup to parse the HTML and extract:
         1. URL of the restaurant
         2. Name of the restaurant
@@ -55,12 +58,37 @@ def fetch_restaurant_data(url):
     PARAM: url (str) - the url to scrape data from
     RETURN: a list of dictionaries, where each dictionary has restaurant details
     """
-    pass
+    import pdb
+
+    # pdb.set_trace()
+
+    # Get the page content and create a beautiful soup object
+    try:
+        page = requests.get(url, timeout=3)
+        page.raise_for_status() # ask Requests to raise any exception it finds
+        # do work, status is no error if we get here
+    except requests.exceptions.HTTPError as e:
+        print("HTTP Error:", e)
+    except requests.exceptions.ConnectionError as e:
+        print("Error Connecting:", e)
+    except requests.exceptions.Timeout as e:
+        print("Timeout Error:", e)
+    except requests.exceptions.RequestException as e: # any Requests error
+        print("Requests Error:", e)
+              
+
+    soup = BeautifulSoup(page.content, "lxml")
+    # print(soup.prettify())
+
+    # Get the restaurant cards
+    # cards = soup.find_all("card__menu-image")
+    # cards = soup.find_all(string="image-wrapper pl-image")
+
 
 def extract_restaurant_data_from_url(url):
     """
-    Use the URL of the restaurant to do a web crawl to the restaurant page and extract the following information: 
-        - Address of the restaurant (street address and city) • 
+    Use the URL of the restaurant to do a web crawl to the restaurant page and extract the following information:
+        - Address of the restaurant (street address and city) •
         - NOTE: Alternatively, the cost and cuisine can be extracted from this page instead of the previous page.
 
     PARAM: url (str) - the url to scrape data from
@@ -68,6 +96,7 @@ def extract_restaurant_data_from_url(url):
     """
     # TODO implement extract_restaurant_data_from_url
     pass
+
 
 def write_to_json_file(data, filename):
     """
@@ -80,8 +109,9 @@ def write_to_json_file(data, filename):
     # TODO implement write_to_json_file
     pass
 
+
 def create_database():
-    """    
+    """
     Create the SQLite database and the tables needed
 
     PARAM: None?
@@ -90,40 +120,36 @@ def create_database():
     # TODO implement create_database
     pass
 
+
 def insert_into_database(conn, data):
     """
     Insert the data into the SQLite database
-    
+
     PARAM: conn - the database connection
     PARAM: data - the data to insert into the database
     """
     pass
 
+
 def main():
+    """
+    Main function to run the program
+    """
+    print(
+        """"
+        ---------------
+        Running main...
+        ---------------
+    """
+    )
     # URLs to scrape data from
     urls = [
-        'https://guide.michelin.com/us/en/california/san-jose/restaurants',
-        'https://guide.michelin.com/us/en/california/cupertino/restaurants'
+        "https://guide.michelin.com/us/en/california/san-jose/restaurants",
+        "https://guide.michelin.com/us/en/california/cupertino/restaurants",
     ]
 
-    # Part A
-    # TODO: will this work? tbd...
-    for url in urls:
-        restaurant_data = fetch_restaurant_data(url)
-        for restaurant in restaurant_data:
-            restaurant.update(extract_restaurant_data_from_url(restaurant['url']))
-        write_to_json_file(restaurant_data, f"{url.split('/')[-1]}.json")
+    fetch_restaurants_directory_data(urls[1])
 
-    # # Part B
-    # conn = create_database()
-    # for url in urls:
-    #     with open(f"{url.split('/')[-1]}.json", 'r') as f:
-    #         data = json.load(f)
-    #         insert_into_database(conn, data)
-    # conn.close()
 
 if __name__ == "__main__":
     main()
-
-
-# End of lab3back.py
