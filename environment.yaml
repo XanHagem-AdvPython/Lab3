@@ -1,0 +1,8 @@
+name: lab3env
+dependencies:
+  - python=3.9.6
+  - beautifulsoup4
+  - numpy
+  - sqlite3
+  - json
+  - pickle
