@@ -41,6 +41,7 @@ from bs4 import BeautifulSoup
 import json
 import re
 import sqlite3
+from collections import defaultdict
 
 
 def fetch_restaurants_directory_data(url):
@@ -60,29 +61,36 @@ def fetch_restaurants_directory_data(url):
     """
     import pdb
 
-    # pdb.set_trace()
-
     # Get the page content and create a beautiful soup object
-    try:
-        page = requests.get(url, timeout=3)
-        page.raise_for_status() # ask Requests to raise any exception it finds
-        # do work, status is no error if we get here
-    except requests.exceptions.HTTPError as e:
-        print("HTTP Error:", e)
-    except requests.exceptions.ConnectionError as e:
-        print("Error Connecting:", e)
-    except requests.exceptions.Timeout as e:
-        print("Timeout Error:", e)
-    except requests.exceptions.RequestException as e: # any Requests error
-        print("Requests Error:", e)
-              
-
+    page = requests.get(url)  # TODO: try-exception block
     soup = BeautifulSoup(page.content, "lxml")
-    # print(soup.prettify())
 
     # Get the restaurant cards
-    # cards = soup.find_all("card__menu-image")
-    # cards = soup.find_all(string="image-wrapper pl-image")
+    cards = soup.find_all("div", class_="card__menu box-placeholder js-restaurant__list_item js-match-height js-map")
+
+    # Create list for restaurant dicts
+    restaurant_dict_list = []
+
+    # Get the restaurant details from each card in the list of cards
+    for card in cards:
+
+        # create a dictionary to store the restaurant details (w/ default vals to avoid key errors)
+        restaurant = defaultdict(lambda: "N/A")
+
+        # Get the restaurant name
+        # restaurant["name"] = card.find("restaurant-name")
+        restaurant["name"] = card.select_one('div.card__menu-content h3.card__menu-content--title').text.strip()
+        # ^ select_one() returns the first element that matches the CSS selector
+        # ^ div.card__menu-content h3.card__menu-content--title is the CSS selector 
+        # for the <h3> tag with class="card__menu-content--title" inside a <div> tag with class="card__menu-content"
+        # ^ text.strip() returns the text of the element, with leading and trailing whitespace removed
+
+        # Get the restaurant URL
+        restaurant["url"] = card.select_one("a.link").get("href")
+        # ^ select_one() returns the first element that matches the CSS selector
+        # ^ a.link is the CSS selector for the <a> tag with class="link"
+        # ^ get() returns the value of the specified attribute - in this case, href (the URL)
+        # print(url)
 
 
 def extract_restaurant_data_from_url(url):
