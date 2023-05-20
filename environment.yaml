@@ -6,3 +6,5 @@ dependencies:
   - sqlite3
   - json
   - pickle
+  - lxml
+  - urllib3==1.26.7
