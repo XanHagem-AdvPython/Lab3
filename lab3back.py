@@ -51,8 +51,6 @@ def fetch_restaurants_directory_data(url):
         1. URL of the restaurant
         2. Name of the restaurant
         3. Location or city name of the restaurant
-
-    NOTE: Optional - can extract the following from the restaurant page instead of the main page:
         4. Cost of the restaurant (number of $$ signs)
         5. Cuisine of the restaurant
 
@@ -83,14 +81,29 @@ def fetch_restaurants_directory_data(url):
         # ^ select_one() returns the first element that matches the CSS selector
         # ^ div.card__menu-content h3.card__menu-content--title is the CSS selector 
         # for the <h3> tag with class="card__menu-content--title" inside a <div> tag with class="card__menu-content"
-        # ^ text.strip() returns the text of the element, with leading and trailing whitespace removed
 
         # Get the restaurant URL
-        restaurant["url"] = card.select_one("a.link").get("href")
-        # ^ select_one() returns the first element that matches the CSS selector
+        restaurant["url"] = "".join(["https://guide.michelin.com", card.select_one("a.link").get("href")])
         # ^ a.link is the CSS selector for the <a> tag with class="link"
         # ^ get() returns the value of the specified attribute - in this case, href (the URL)
         # print(url)
+
+        # Get the restaurant location
+        restaurant["location"] = card.select_one("div.card__menu-footer--location").text.strip()
+        # ^ using CSS selector for <div> tag, class="card__menu-footer--location"
+        # NOTE: this also gets the country, which is not needed. will keep for now.
+
+        # Get the restaurant cost and cuisine type from the footer
+        cost_and_type = card.select_one("div.card__menu-footer--price").text.split("·")
+        restaurant["cost"] = cost_and_type[0].strip()
+        restaurant["cuisine"] = cost_and_type[1].strip()
+
+        # Add the restaurant dictionary to the list of restaurant dictionaries
+        restaurant_dict_list.append(restaurant)
+
+    # return restaurant_dict_list
+    return restaurant_dict_list
+
 
 
 def extract_restaurant_data_from_url(url):
@@ -156,7 +169,16 @@ def main():
         "https://guide.michelin.com/us/en/california/cupertino/restaurants",
     ]
 
-    fetch_restaurants_directory_data(urls[1])
+    # try fetching data from the first URL to test
+    restaraunts = fetch_restaurants_directory_data(urls[1])
+
+    # List of dictionary keys
+    keys = ["name", "url", "location", "cost", "cuisine"]
+
+    for restaurant in restaraunts:
+        for key in keys:
+            print(f"{key}: {restaurant[key]}")
+        print("\n")
 
 
 if __name__ == "__main__":
