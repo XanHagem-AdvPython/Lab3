@@ -59,51 +59,66 @@ def fetch_restaurants_directory_data(url):
     """
     import pdb
 
-    # Get the page content and create a beautiful soup object
-    page = requests.get(url)  # TODO: try-exception block
-    soup = BeautifulSoup(page.content, "lxml")
-
-    # Get the restaurant cards
-    cards = soup.find_all("div", class_="card__menu box-placeholder js-restaurant__list_item js-match-height js-map")
-
     # Create list for restaurant dicts
     restaurant_dict_list = []
 
-    # Get the restaurant details from each card in the list of cards
-    for card in cards:
+    # use list of restaurant names to check if restaurant is already in the list
+    restaurant_names = []
 
-        # create a dictionary to store the restaurant details (w/ default vals to avoid key errors)
-        restaurant = defaultdict(lambda: "N/A")
+    # while loop to get all pages
+    while url:
+        # Get the page content and create a beautiful soup object
+        page = requests.get(url)  # TODO: try-exception block
+        soup = BeautifulSoup(page.content, "lxml")
 
-        # Get the restaurant name
-        # restaurant["name"] = card.find("restaurant-name")
-        restaurant["name"] = card.select_one('div.card__menu-content h3.card__menu-content--title').text.strip()
-        # ^ select_one() returns the first element that matches the CSS selector
-        # ^ div.card__menu-content h3.card__menu-content--title is the CSS selector 
-        # for the <h3> tag with class="card__menu-content--title" inside a <div> tag with class="card__menu-content"
+        # Get the restaurant cards
+        cards = soup.find_all(
+            "div", class_="card__menu box-placeholder js-restaurant__list_item js-match-height js-map"
+        )
 
-        # Get the restaurant URL
-        restaurant["url"] = "".join(["https://guide.michelin.com", card.select_one("a.link").get("href")])
-        # ^ a.link is the CSS selector for the <a> tag with class="link"
-        # ^ get() returns the value of the specified attribute - in this case, href (the URL)
-        # print(url)
+        print(f"SCRAPING PAGE: {url} \n")
 
-        # Get the restaurant location
-        restaurant["location"] = card.select_one("div.card__menu-footer--location").text.strip()
-        # ^ using CSS selector for <div> tag, class="card__menu-footer--location"
-        # NOTE: this also gets the country, which is not needed. will keep for now.
+        # Get the restaurant details from each card in the list of cards
+        for card in cards:
+            # create a dictionary to store the restaurant details (w/ default vals to avoid key errors)
+            restaurant = defaultdict(lambda: "N/A")
 
-        # Get the restaurant cost and cuisine type from the footer
-        cost_and_type = card.select_one("div.card__menu-footer--price").text.split("·")
-        restaurant["cost"] = cost_and_type[0].strip()
-        restaurant["cuisine"] = cost_and_type[1].strip()
+            # Get the restaurant name
+            # restaurant["name"] = card.find("restaurant-name")
+            restaurant["name"] = card.select_one("div.card__menu-content h3.card__menu-content--title").text.strip()
+            # ^ select_one() returns the first element that matches the CSS selector
+            # ^ div.card__menu-content h3.card__menu-content--title is the CSS selector
+            # for the <h3> tag with class="card__menu-content--title" inside a <div> tag with class="card__menu-content"
 
-        # Add the restaurant dictionary to the list of restaurant dictionaries
-        restaurant_dict_list.append(restaurant)
+            # Get the restaurant URL
+            restaurant["url"] = "".join(["https://guide.michelin.com", card.select_one("a.link").get("href")])
+            # ^ a.link is the CSS selector for the <a> tag with class="link"
+            # ^ get() returns the value of the specified attribute - in this case, href (the URL)
+            # print(url)
 
-    # return restaurant_dict_list
+            # Get the restaurant location
+            restaurant["location"] = card.select_one("div.card__menu-footer--location").text.strip()
+            # ^ using CSS selector for <div> tag, class="card__menu-footer--location"
+            # NOTE: this also gets the country, which is not needed. will keep for now.
+
+            # Get the restaurant cost and cuisine type from the footer
+            cost_and_type = card.select_one("div.card__menu-footer--price").text.split("·")
+            restaurant["cost"] = cost_and_type[0].strip()
+            restaurant["cuisine"] = cost_and_type[1].strip()
+
+            restaurant_dict_list.append(restaurant)
+            restaurant_names.append(restaurant["name"])
+
+        # Get the next page URL, if it exists. Only get the link with the right arrow icon!
+        next_page_link = soup.select_one(
+            "div.btn-carousel a.btn-carousel__link[href*='/page/'][href]:has(span.icon.fal.fa-angle-right)"
+        )
+        if next_page_link:
+            url = "".join(["https://guide.michelin.com", next_page_link["href"]])
+        else:
+            url = None
+
     return restaurant_dict_list
-
 
 
 def extract_restaurant_data_from_url(url):
@@ -158,26 +173,29 @@ def main():
     """
     print(
         """"
-        ---------------
-        Running main...
-        ---------------
+        ----------------------
+        |   Running main...   |
+        ----------------------
     """
     )
     # URLs to scrape data from
-    urls = [
-        "https://guide.michelin.com/us/en/california/san-jose/restaurants",
-        "https://guide.michelin.com/us/en/california/cupertino/restaurants",
-    ]
+    urls = {
+        "San Jose": "https://guide.michelin.com/us/en/california/san-jose/restaurants",
+        "Cupertino": "https://guide.michelin.com/us/en/california/cupertino/restaurants",
+    }
 
-    # try fetching data from the first URL to test
-    restaraunts = fetch_restaurants_directory_data(urls[1])
+    sj_restaurants = fetch_restaurants_directory_data(urls["San Jose"])
+    cp_restaurants = fetch_restaurants_directory_data(urls["Cupertino"])
 
-    # List of dictionary keys
-    keys = ["name", "url", "location", "cost", "cuisine"]
+    # get the restaurant data from both cities, skipping duplicates
+    restaurants = []
+    restaurants.extend(r for r in fetch_restaurants_directory_data(urls["San Jose"]) if r not in restaurants)
+    restaurants.extend(r for r in fetch_restaurants_directory_data(urls["Cupertino"]) if r not in restaurants)
 
-    for restaurant in restaraunts:
-        for key in keys:
-            print(f"{key}: {restaurant[key]}")
+    # print the restaurant data
+    for restaurant in sorted(restaurants, key=lambda x: x["name"]):
+        for key, value in restaurant.items():
+            print(f"{key}: {value}")
         print("\n")
 
 
