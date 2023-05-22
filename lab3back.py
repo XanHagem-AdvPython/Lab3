@@ -57,15 +57,11 @@ def fetch_restaurants_directory_data(url):
     PARAM: url (str) - the url to scrape data from
     RETURN: a list of dictionaries, where each dictionary has restaurant details
     """
-    import pdb
-
     # Create list for restaurant dicts
     restaurant_dict_list = []
 
-    # use list of restaurant names to check if restaurant is already in the list
-    restaurant_names = []
-
     # while loop to get all pages
+    # NOTE: recursion would also work, but could be risky for... reasons.
     while url:
         # Get the page content and create a beautiful soup object
         page = requests.get(url)  # TODO: try-exception block
@@ -75,8 +71,6 @@ def fetch_restaurants_directory_data(url):
         cards = soup.find_all(
             "div", class_="card__menu box-placeholder js-restaurant__list_item js-match-height js-map"
         )
-
-        print(f"SCRAPING PAGE: {url} \n")
 
         # Get the restaurant details from each card in the list of cards
         for card in cards:
@@ -107,7 +101,6 @@ def fetch_restaurants_directory_data(url):
             restaurant["cuisine"] = cost_and_type[1].strip()
 
             restaurant_dict_list.append(restaurant)
-            restaurant_names.append(restaurant["name"])
 
         # Get the next page URL, if it exists. Only get the link with the right arrow icon!
         next_page_link = soup.select_one(
@@ -121,20 +114,22 @@ def fetch_restaurants_directory_data(url):
     return restaurant_dict_list
 
 
-def extract_restaurant_data_from_url(url):
+def extract_restaurant_address(url):
     """
-    Use the URL of the restaurant to do a web crawl to the restaurant page and extract the following information:
-        - Address of the restaurant (street address and city) •
-        - NOTE: Alternatively, the cost and cuisine can be extracted from this page instead of the previous page.
+    Use the URL of the restaurant to extract address (street address and city)
 
-    PARAM: url (str) - the url to scrape data from
-    RETURN: a list of dictionaries, where each dictionary has restaurant details
+    PARAM: url (str) - url of the restaurants' Michelin page
+    RETURN: the street address and city of the restaurant (str)
     """
-    # TODO implement extract_restaurant_data_from_url
-    pass
+    # get the page content and create a beautiful soup object
+    page = requests.get(url)
+    soup = BeautifulSoup(page.content, "lxml")
+
+    # get the restaurant address
+    return soup.select_one("li.restaurant-details__heading--address").text.strip()
 
 
-def write_to_json_file(data, filename):
+def write_to_json_file(restauraunts_dict, filename):
     """
     Write data to a JSON file
 
@@ -142,29 +137,188 @@ def write_to_json_file(data, filename):
     PARAM: filename - the name of the file to write to
     TODO: try using args and kwargs??
     """
-    # TODO implement write_to_json_file
-    pass
+    with open(filename, "w", encoding="utf-8") as file:
+        json.dump(restauraunts_dict, file, indent=4)
 
 
 def create_database():
     """
-    Create the SQLite database and the tables needed
+    Create the SQLite database and the tables needed with the following schema:
+    - Restaurant name
+    - Restaurant URL
+    - Location (lookup table), int : city
+    - Cost (lookup table), int : n$
+    - Cuisine type (lookup table), int : type
+    - Addess (street address and city)
 
-    PARAM: None?
+    PARAM:
     RETURN: the database connection (type: sqlite3.connect??)
     """
-    # TODO implement create_database
-    pass
+    # Connect to the database
+    conn = sqlite3.connect("restaurants.db")
+    cursor = conn.cursor()
+
+    ## Create the tables needed for the database
+
+    # Create the "Cuisine" lookup table
+    cursor.execute(
+        """CREATE TABLE IF NOT EXISTS Cuisine (
+        cuisine_id INTEGER PRIMARY KEY,
+        cuisine_name TEXT UNIQUE
+        )"""
+    )
+
+    # Create the "Cost" lookup table
+    cursor.execute(
+        """CREATE TABLE IF NOT EXISTS Cost (
+        cost_id INTEGER PRIMARY KEY,
+        cost_symbol TEXT UNIQUE
+        )"""
+    )
+
+    # Create the "Location" lookup table
+    cursor.execute(
+        """CREATE TABLE IF NOT EXISTS Location (
+        location_id INTEGER PRIMARY KEY,
+        location_name TEXT UNIQUE
+        )"""
+    )
+
+    # Create the "Restaurant" table
+    cursor.execute(
+        """CREATE TABLE IF NOT EXISTS Restaurant (
+        restaurant_id INTEGER PRIMARY KEY,
+        restaurant_name TEXT UNIQUE,
+        cuisine_id INTEGER,
+        cost_id INTEGER,
+        location_id INTEGER,
+        street_address TEXT NOT NULL,
+        FOREIGN KEY (cuisine_id) REFERENCES Cuisine (cuisine_id),
+        FOREIGN KEY (cost_id) REFERENCES Cost (cost_id),
+        FOREIGN KEY (location_id) REFERENCES Location (location_id)
+        )"""
+    )
+
+    # Add indeces to the foreign key columns in the "Restaurant" table
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cuisine_id ON Restaurant (cuisine_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cost_id ON Restaurant (cost_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_location_id ON Restaurant (location_id)")
+
+    # Commit the changes to the database
+    conn.commit()
+
+    # Return the database connection
+    return conn
 
 
-def insert_into_database(conn, data):
+def insert_into_database(conn, dict_list):
     """
     Insert the data into the SQLite database
 
     PARAM: conn - the database connection
-    PARAM: data - the data to insert into the database
+    PARAM: dict_list - the data to insert into the database
     """
-    pass
+    # Get the cursor
+    cursor = conn.cursor()
+
+    # Insert into the database in the order that respects the foreign key constraints
+    for row in dict_list:
+        # Extract the values from the dictionary
+        restaurant_name = row["name"]
+        cuisine_name = row["cuisine"]
+        cost_symbol = row["cost"]
+        location_name = row["location"]
+        street_address = row["address"]
+
+        # Insert the data into the "Cuisine" table
+        cursor.execute(
+            "INSERT OR IGNORE INTO Cuisine (cuisine_name) VALUES (?)",
+            (cuisine_name,),
+        )
+
+        # Insert the data into the "Cost" table
+        cursor.execute(
+            "INSERT OR IGNORE INTO Cost (cost_symbol) VALUES (?)",
+            (cost_symbol,),
+        )
+
+        # Insert the data into the "Location" table
+        cursor.execute(
+            "INSERT OR IGNORE INTO Location (location_name) VALUES (?)",
+            (location_name,),
+        )
+
+        # Get the IDs from the lookup tables
+        cuisine_id = cursor.lastrowid
+        cost_id = cursor.lastrowid
+        location_id = cursor.lastrowid
+
+        # Insert the data into the "Restaurant" table
+        cursor.execute(
+            "INSERT OR IGNORE INTO Restaurant (restaurant_name, cuisine_id, cost_id, location_id, street_address) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (restaurant_name, cuisine_id, cost_id, location_id, street_address),
+        )
+
+    # Commit the changes to the database
+    conn.commit()
+
+
+def view_database(conn):
+    """
+    View the contents of the SQLite database
+
+    PARAM: conn - the database connection
+    """
+    # Get the cursor
+    cursor = conn.cursor()
+
+    # Get the table names in the database
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    table_names = cursor.fetchall()
+
+    # Iterate over the table names
+    for table in table_names:
+        table_name = table[0]
+        print(f"\n*** {table_name} ***")
+
+        # Execute a SELECT query for the current table
+        cursor.execute(f"SELECT * FROM {table_name}")
+
+        # Fetch all the rows from the result set
+        rows = cursor.fetchall()
+
+        # Print the rows
+        for row in rows:
+            print(row)
+
+
+def view_decoded_database(conn):
+    """
+    View the contents of the SQLite database
+
+    PARAM: conn - the database connection
+    """
+    # Get the cursor
+    cursor = conn.cursor()
+
+    # Execute a SELECT query with JOIN operations to retrieve data from the "Restaurant" table and related lookup tables
+    cursor.execute(
+        """
+        SELECT R.restaurant_name, C.cuisine_name, CO.cost_symbol, L.location_name, R.street_address
+        FROM Restaurant R
+        JOIN Cuisine C ON R.cuisine_id = C.cuisine_id
+        JOIN Cost CO ON R.cost_id = CO.cost_id
+        JOIN Location L ON R.location_id = L.location_id
+    """
+    )
+
+    # Fetch all the rows from the result set
+    rows = cursor.fetchall()
+
+    # Print the rows with row indices
+    for index, row in enumerate(rows, start=1):
+        print(f"Row {index}: {row}")
 
 
 def main():
@@ -187,16 +341,51 @@ def main():
     sj_restaurants = fetch_restaurants_directory_data(urls["San Jose"])
     cp_restaurants = fetch_restaurants_directory_data(urls["Cupertino"])
 
-    # get the restaurant data from both cities, skipping duplicates
-    restaurants = []
-    restaurants.extend(r for r in fetch_restaurants_directory_data(urls["San Jose"]) if r not in restaurants)
-    restaurants.extend(r for r in fetch_restaurants_directory_data(urls["Cupertino"]) if r not in restaurants)
+    part_A = False
 
-    # print the restaurant data
-    for restaurant in sorted(restaurants, key=lambda x: x["name"]):
-        for key, value in restaurant.items():
-            print(f"{key}: {value}")
-        print("\n")
+    if part_A:
+        print("\n ***** TESTING PART A: Scraping & writing to json ***** \b")
+
+        # get the restaurant data from both cities, skipping duplicates
+        restaurants = []
+        restaurants.extend(r for r in fetch_restaurants_directory_data(urls["San Jose"]) if r not in restaurants)
+        restaurants.extend(r for r in fetch_restaurants_directory_data(urls["Cupertino"]) if r not in restaurants)
+
+        # Now, use the restaurant urls to get the restaurant street addresses, and add to dictionary
+        for restaurant in restaurants:
+            restaurant["address"] = extract_restaurant_address(restaurant["url"])
+
+        # print the restaurant data
+        for restaurant in sorted(restaurants, key=lambda x: x["name"]):
+            for key, value in restaurant.items():
+                print(f"{key}: {value}")
+            print("\n")
+
+        # Great! Now, write the data to a JSON file using the write_to_json_file() function
+        write_to_json_file(restaurants, "restaurants.json")
+
+    if not part_A:
+        print("\n ***** TESTING PART B: writing to & reading from db ***** \n")
+
+        # read the data from the JSON file
+        with open("restaurants.json", "r") as file:
+            restaurants_from_json = json.load(file)
+
+        print(f"Number of restaurants: {len(restaurants_from_json)}")
+
+        # Call the create_database() function to create the database and get the connection
+        conn = create_database()
+
+        # Call the insert_into_database() function to insert the data into the database
+        insert_into_database(conn, restaurants_from_json)
+
+        # # Call the view_database() function to view the contents of the database
+        print("\n *** View the database *** \n")
+        view_database(conn)
+
+        # Call the view_decoded_database() function to view the contents of the database
+        print("\n *** View the DECODED database *** \n")
+        view_decoded_database(conn)  # FIXME: NOT WORKING! ONLY PRINTING FIRST SIX ROWS
 
 
 if __name__ == "__main__":
