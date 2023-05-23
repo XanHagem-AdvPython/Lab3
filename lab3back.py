@@ -126,7 +126,11 @@ def extract_restaurant_address(url):
     soup = BeautifulSoup(page.content, "lxml")
 
     # get the restaurant address
-    return soup.select_one("li.restaurant-details__heading--address").text.strip()
+    address_element = soup.select_one("li.restaurant-details__heading--address")
+    if address_element:
+        return address_element.text.strip()
+    else:
+        return ""
 
 
 def write_to_json_file(restauraunts_dict, filename):
@@ -189,6 +193,7 @@ def create_database():
         """CREATE TABLE IF NOT EXISTS Restaurant (
         restaurant_id INTEGER PRIMARY KEY,
         restaurant_name TEXT UNIQUE,
+        restaurant_url TEXT UNIQUE,
         cuisine_id INTEGER,
         cost_id INTEGER,
         location_id INTEGER,
@@ -225,6 +230,7 @@ def insert_into_database(conn, dict_list):
     for row in dict_list:
         # Extract the values from the dictionary
         restaurant_name = row["name"]
+        restaurant_url = row["url"]
         cuisine_name = row["cuisine"]
         cost_symbol = row["cost"]
         location_name = row["location"]
@@ -255,9 +261,9 @@ def insert_into_database(conn, dict_list):
 
         # Insert the data into the "Restaurant" table
         cursor.execute(
-            "INSERT OR IGNORE INTO Restaurant (restaurant_name, cuisine_id, cost_id, location_id, street_address) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (restaurant_name, cuisine_id, cost_id, location_id, street_address),
+            "INSERT OR IGNORE INTO Restaurant (restaurant_name, restaurant_url, cuisine_id, cost_id, location_id, street_address) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (restaurant_name, restaurant_url, cuisine_id, cost_id, location_id, street_address),
         )
 
     # Commit the changes to the database
@@ -266,7 +272,7 @@ def insert_into_database(conn, dict_list):
 
 def view_database(conn):
     """
-    View the contents of the SQLite database
+    View the contents of the SQLite database in separate relational tables (for testing)
 
     PARAM: conn - the database connection
     """
@@ -295,7 +301,7 @@ def view_database(conn):
 
 def view_decoded_database(conn):
     """
-    View the contents of the SQLite database
+    View the DECODED contents of the SQLite database (for testing)
 
     PARAM: conn - the database connection
     """
@@ -323,7 +329,7 @@ def view_decoded_database(conn):
 
 def main():
     """
-    Main function to run the program
+    Main function (testing)
     """
     print(
         """"
@@ -383,9 +389,9 @@ def main():
         print("\n *** View the database *** \n")
         view_database(conn)
 
-        # Call the view_decoded_database() function to view the contents of the database
-        print("\n *** View the DECODED database *** \n")
-        view_decoded_database(conn)  # FIXME: NOT WORKING! ONLY PRINTING FIRST SIX ROWS
+        # # Call the view_decoded_database() function to view the contents of the database
+        # print("\n *** View the DECODED database *** \n")
+        # view_decoded_database(conn)  # FIXME: NOT WORKING! ONLY PRINTING FIRST SIX ROWS
 
 
 if __name__ == "__main__":
