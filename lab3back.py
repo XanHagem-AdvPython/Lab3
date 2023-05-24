@@ -1,5 +1,5 @@
 """
-Authors: Alex Hagemeister & Marcel LAstnAmE
+Authors: Alex Hagemeister & Marcel Gunadi
 Spring Quarter, 2023
 CIS41B Advanced Python
 
@@ -35,11 +35,9 @@ PART B: Data Storage
 
 """
 
-import urllib.request as ur
 import requests
 from bs4 import BeautifulSoup
 import json
-import re
 import sqlite3
 from collections import defaultdict
 
@@ -55,16 +53,19 @@ def fetch_restaurants_directory_data(url):
         5. Cuisine of the restaurant
 
     PARAM: url (str) - the url to scrape data from
-    RETURN: a list of dictionaries, where each dictionary has restaurant details
+    RETURN: a list of dictionaries, where each dictionary has restaurant details, if fails returns false
     """
     # Create list for restaurant dicts
     restaurant_dict_list = []
-
     # while loop to get all pages
     # NOTE: recursion would also work, but could be risky for... reasons.
     while url:
         # Get the page content and create a beautiful soup object
-        page = requests.get(url)  # TODO: try-exception block
+        try:
+            page = requests.get(url)  # TODO: try-exception block    
+        except:
+            return False
+        
         soup = BeautifulSoup(page.content, "lxml")
 
         # Get the restaurant cards
@@ -241,23 +242,24 @@ def insert_into_database(conn, dict_list):
             "INSERT OR IGNORE INTO Cuisine (cuisine_name) VALUES (?)",
             (cuisine_name,),
         )
+        cursor.execute("SELECT cuisine_id FROM Cuisine WHERE cuisine_name = ?", (cuisine_name,))
+        cuisine_id = cursor.fetchone()[0]
 
         # Insert the data into the "Cost" table
         cursor.execute(
             "INSERT OR IGNORE INTO Cost (cost_symbol) VALUES (?)",
             (cost_symbol,),
         )
+        cursor.execute("SELECT cost_id FROM Cost WHERE cost_symbol = ?", (cost_symbol,))
+        cost_id = cursor.fetchone()[0]
 
         # Insert the data into the "Location" table
         cursor.execute(
             "INSERT OR IGNORE INTO Location (location_name) VALUES (?)",
             (location_name,),
         )
-
-        # Get the IDs from the lookup tables
-        cuisine_id = cursor.lastrowid
-        cost_id = cursor.lastrowid
-        location_id = cursor.lastrowid
+        cursor.execute("SELECT location_id FROM Location WHERE location_name = ?", (location_name,))
+        location_id = cursor.fetchone()[0]
 
         # Insert the data into the "Restaurant" table
         cursor.execute(
@@ -268,7 +270,6 @@ def insert_into_database(conn, dict_list):
 
     # Commit the changes to the database
     conn.commit()
-
 
 def view_database(conn):
     """
@@ -367,7 +368,7 @@ def main():
                 print(f"{key}: {value}")
             print("\n")
 
-        # Great! Now, write the data to a JSON file using the write_to_json_file() function
+        # Now, write the data to a JSON file using the write_to_json_file() function
         write_to_json_file(restaurants, "restaurants.json")
 
     if not part_A:
@@ -390,8 +391,8 @@ def main():
         view_database(conn)
 
         # # Call the view_decoded_database() function to view the contents of the database
-        # print("\n *** View the DECODED database *** \n")
-        # view_decoded_database(conn)  # FIXME: NOT WORKING! ONLY PRINTING FIRST SIX ROWS
+        print("\n *** View the DECODED database *** \n")
+        view_decoded_database(conn)  # FIXME: NOT WORKING! ONLY PRINTING FIRST SIX ROWS
 
 
 if __name__ == "__main__":
