@@ -14,10 +14,13 @@ import webbrowser
 
 class MainWindow(tk.Tk):
     """
-    Main window of the program - all other windows are created from this window
+    Main window of the program:
+        - Responsible for displaying the main user interface and options
+        - Handles user interactions related to searching by city or cuisine
+        - Creates and manages instances of other windows
     """
-
     def __init__(self):
+        # Need to call the constructor of the parent class
         super().__init__()
         self.title("Restaurants")
         # Add labels to the main window
@@ -26,7 +29,7 @@ class MainWindow(tk.Tk):
         )
         tk.Label(self, text="Search by", fg="black", font=("Arial", 15)).grid(row=1, column=0, columnspan=3, pady=10)
 
-        # Add buttons that call processCity and processCuisine respectively
+        # Add buttons that call the search_by_city and search_by_cuisine methods
         tk.Button(self, text="City", fg="blue", command=self.search_by_city).grid(row=2, column=0, padx=15, pady=10)
         tk.Button(self, text="Cuisine", fg="blue", command=self.search_by_cuisine).grid(
             row=2, column=1, padx=15, pady=10
@@ -47,13 +50,18 @@ class MainWindow(tk.Tk):
 
     def search_by_city(self):
         """
-        Displays a list of cities from database for the user to select
+        RHandles the user's choice to search for restaurants by city.
+
+            - Retrieves a list of cities from the database and displays them in a dialog window.
+            - Waits for the user to select a city and retrieves the corresponding restaurants for that city.
+            - Displays the selected restaurants in another dialog window.
+            - User can choose one or more restaurants, opening a separate DisplayWindow for each selection
 
         """
         # Create an instance of DialogWindow, passing the current instance of MainWindow and the database connection
         self.cities_window = DialogWindow(self, self.conn)
         # Call displayCity method of DialogWindow to display a list of cities
-        self.cities_window.displayCity()
+        self.cities_window.display_cities()
         # Wait for the dialog window to be closed before continuing
         # blocks execution of the next line until the dialog window is closed
         self.wait_window(self.cities_window)
@@ -66,7 +74,7 @@ class MainWindow(tk.Tk):
             # create a new dialog win to retrieve restaurant's city
             self.restauraunts_window = DialogWindow(self, self.conn)
             # retrieve restaurant from given cityID
-            self.restauraunts_window.retrieveCityRestaurant(cityID)
+            self.restauraunts_window.get_restauraunt_from_cityID(cityID)
             # wait for the dialog window to be closed before continuing
             self.wait_window(self.restauraunts_window)
 
@@ -84,13 +92,19 @@ class MainWindow(tk.Tk):
 
     def search_by_cuisine(self):
         """
-        Displays a list of cuisine from database, process user's choice and call DisplayWindow
+        Handles the user's choice to search for restaurants by cuisine.
+
+            - Retrieves a list of cuisines from the database and displays them in a dialog window.
+            - Waits for the user to select a cuisine and retrieves the restaurant
+            - Displays the selected restaurants in another dialog window.
+            - Allows the user to choose one or more restaurants, opening a separate window (DisplayWindow) for each selection
         """
         self.cities_window = DialogWindow(self, self.conn)
-        self.cities_window.displayCuisine()
+        self.cities_window.display_cuisines()
         self.wait_window(self.cities_window)
 
-        selectedRestaurant = "No restaurant selected"  # Define selectedRestaurant before the if clause
+        # 
+        selectedRestaurant = "No selection"  
 
         if len(self.cities_window.getSelection) != 0:
             # indices of choices in the listbox starts with 0, so should be +1 to get correct ID
@@ -98,7 +112,7 @@ class MainWindow(tk.Tk):
 
             # create a new dialog win to retrieve restaurant's city
             self.restauraunts_window = DialogWindow(self, self.conn)
-            self.restauraunts_window.retrieveCuisineRestaurant(cuisineID)
+            self.restauraunts_window.get_restauraunts_by_cuisine(cuisineID)
             self.wait_window(self.restauraunts_window)
 
             # fetch restaurants' ID that have the same cuisineID
@@ -122,7 +136,12 @@ class MainWindow(tk.Tk):
 
 class DialogWindow(tk.Toplevel):
     """
-    A class which interact and get input from user
+    Dialog window that interacts with the user and gets input.
+
+        - Displays a list of cities or cuisines for the user to select.
+        - Retrieves information from the database based on the user's selection (city or cuisine).
+        - Allows the user to select items from the list and returns the selected items.
+        - Provides methods to close the dialog window and communicate with the MainWindow.    
     """
 
     def __init__(self, master, connDB):
@@ -134,9 +153,14 @@ class DialogWindow(tk.Toplevel):
         self._selection = ()
         self.conn = connDB
 
-    def displayCity(self):
+    def display_cities(self):
         """
-        A method which display a list of cities for user to select
+        Displays a list of cities for the user to select.
+
+            - Retrieves the list of cities from the database.
+            - Displays the cities in a listbox within a dialog window.
+            - Waits for the user to make a selection from the list.
+            - Returns the selected city to the calling function (MainWindow).
         """
         tk.Label(self, text="Click on a city to select", font=("Helvetica", 15)).grid(row=0, padx=15, pady=10)
 
@@ -160,9 +184,14 @@ class DialogWindow(tk.Toplevel):
             row=2, column=0, columnspan=2, padx=20, pady=20
         )
 
-    def displayCuisine(self):
+    def display_cuisines(self):
         """
-        A method which display a list of cuisine for user to select
+        Displays a list of cuisines for the user to select.
+
+            - Retrieves the list of cuisines from the database.
+            - Displays the cuisines in a listbox within a dialog window.
+            - Waits for the user to make a selection from the list.
+            - Returns the selected cuisine to the calling function (MainWindow).
         """
         tk.Label(self, text="Click on a cuisine to select", font=("Helvetica", 15)).grid(row=0, padx=15, pady=10)
 
@@ -187,22 +216,25 @@ class DialogWindow(tk.Toplevel):
             row=2, column=0, columnspan=2, padx=20, pady=20
         )
 
-    def retrieveCityRestaurant(self, cityID):
+    def get_restauraunt_from_cityID(self, cityID):
         """
-        A method which retrieve restaurant from given cityID
+        Displays restaurants based on the selected city ID for the user to select.
+
+            - Retrieves the restaurants from the database that match the selected city ID.
+            - Displays the restaurants in a listbox within a dialog window.
+            - Waits for the user to make a selection from the list.
+            - Returns the selected restaurants to the calling function (MainWindow).
         """
         tk.Label(self, text="Click on a restaurant to select", font=("Helvetica", 15)).grid(row=0, padx=15, pady=10)
 
-        # Listbox and Scrollbar
+        # Create the Listbox and Scrollbar widgets
         self.listbox = tk.Listbox(self, height=6, selectmode="multiple")
         self.scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.listbox.yview)
         self.listbox.configure(yscrollcommand=self.scrollbar.set)
 
         # Connect to database
-
         self.cur = self.conn.cursor()
 
-        # self.cur.execute("SELECT Main.name FROM Main WHERE Main.loc = ?",(cityID,))
         self.cur.execute(
             "SELECT Restaurant.restaurant_name FROM Restaurant WHERE Restaurant.location_id = ?", (cityID,)
         )
@@ -221,9 +253,14 @@ class DialogWindow(tk.Toplevel):
             row=2, column=0, columnspan=2, padx=20, pady=20
         )
 
-    def retrieveCuisineRestaurant(self, cuisineID):
+    def get_restauraunts_by_cuisine(self, cuisineID):
         """
-        A method which retrieve restaurant from given cuisineID
+        Displays restaurants based on the selected cuisine ID for the user to select.
+
+            - Retrieves the restaurants from the database that match the selected cuisine ID.
+            - Displays the restaurants in a listbox within a dialog window.
+            - Allows the user to select one or more restaurants.
+            - Returns the selected restaurants to the calling function (MainWindow).
         """
         tk.Label(self, text="Click on a restaurant to select", font=("Helvetica", 15)).grid(row=0, padx=15, pady=10)
 
@@ -269,7 +306,11 @@ class DialogWindow(tk.Toplevel):
 
 class DisplayWindow(tk.Toplevel):
     """
-    A class which shows info of selected restaurants
+    Displays information about selected restaurants in a separate window.
+
+        - Shows details such as the restaurant's name, address, cost, cuisine, and a button to visit its webpage.
+        - Retrieves information from the database based on the selected restaurant ID.
+        - Provides a method to open the restaurant's webpage in a web browser.
     """
 
     def __init__(self, master, restaurantID, connDB):
@@ -280,7 +321,6 @@ class DisplayWindow(tk.Toplevel):
         self.conn = connDB
         self.cur = self.conn.cursor()
 
-        # self.cur.execute("SELECT * FROM Main WHERE Main.id = ?",(restaurantID,))
         self.cur.execute("SELECT * FROM Restaurant WHERE Restaurant.restaurant_id = ?", (restaurantID,))
         restaurant = self.cur.fetchone()
 
@@ -294,7 +334,6 @@ class DisplayWindow(tk.Toplevel):
         )
         cost = self.cur.fetchone()[0]
 
-        # self.cur.execute("SELECT Cuisine.cuisine FROM Main JOIN Cuisine ON Main.kind = Cuisine.id AND Main.id = ?",(restaurantID,))
         self.cur.execute(
             "SELECT Cuisine.cuisine_name FROM Restaurant JOIN Cuisine ON Restaurant.cuisine_id = Cuisine.cuisine_id AND Restaurant.restaurant_id = ?",
             (restaurantID,),
