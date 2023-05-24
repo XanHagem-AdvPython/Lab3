@@ -15,14 +15,16 @@ import webbrowser
 class MainWindow(tk.Tk):
     """
     Main window of the program:
+
         - Responsible for displaying the main user interface and options
         - Handles user interactions related to searching by city or cuisine
         - Creates and manages instances of other windows
     """
+
     def __init__(self):
-        # Need to call the constructor of the parent class
-        super().__init__()
+        super().__init__()  # Need to call the constructor of the parent class
         self.title("Restaurants")
+
         # Add labels to the main window
         tk.Label(self, text="Local Michelin Guild Restaurants", fg="blue", font=("Arial", 17)).grid(
             row=0, column=0, columnspan=3, pady=10, padx=10
@@ -45,8 +47,8 @@ class MainWindow(tk.Tk):
         # If failed, show error message and close the program
         except sqlite3.OperationalError:
             tkmb.showerror("Error", "Failed to open database")
-            self.destroy()
-            self.quit()
+            self.destroy() # Close the main window
+            self.quit() # Close the program
 
     def search_by_city(self):
         """
@@ -78,17 +80,18 @@ class MainWindow(tk.Tk):
             # wait for the dialog window to be closed before continuing
             self.wait_window(self.restauraunts_window)
 
-            # fetch restaurants' ID that have the same cityID
+            # Get the restaurant with the selected index from the listbox
             self.cur.execute(
                 "SELECT Restaurant.restaurant_id FROM Restaurant WHERE Restaurant.location_id = ?", (cityID,)
             )
             selectedRestaurant = self.cur.fetchall()
 
+            # open a new DisplayWindow for each selected restaurant
             for i in self.restauraunts_window.getSelection:
-                # pass the restaurant's ID with indices of selected restaurant from the dialog to DisplayWindow
+                # Pass the restaurant's ID that was selected from the dialog to DisplayWindow
                 DisplayWindow(self, selectedRestaurant[i][0], self.conn)
 
-        print(f"Selected restaurant IDs in processCity: {selectedRestaurant}")
+        print(f"Selected restaurant: {selectedRestaurant}")
 
     def search_by_cuisine(self):
         """
@@ -99,12 +102,15 @@ class MainWindow(tk.Tk):
             - Displays the selected restaurants in another dialog window.
             - Allows the user to choose one or more restaurants, opening a separate window (DisplayWindow) for each selection
         """
+        # Create an instance of DialogWindow, passing the current instance of MainWindow and the database connection
         self.cities_window = DialogWindow(self, self.conn)
+        # Call displayCuisine method of DialogWindow to display a list of cuisines
         self.cities_window.display_cuisines()
+        # Wait for the dialog window to be closed before continuing
         self.wait_window(self.cities_window)
 
-        # 
-        selectedRestaurant = "No selection"  
+        # Set selectedRestaurant to a default value
+        selectedRestaurant = "No selection"
 
         if len(self.cities_window.getSelection) != 0:
             # indices of choices in the listbox starts with 0, so should be +1 to get correct ID
@@ -115,20 +121,22 @@ class MainWindow(tk.Tk):
             self.restauraunts_window.get_restauraunts_by_cuisine(cuisineID)
             self.wait_window(self.restauraunts_window)
 
-            # fetch restaurants' ID that have the same cuisineID
+            # fetch the restaurant with the selected index
             self.cur.execute(
                 "SELECT Restaurant.restaurant_id FROM Restaurant WHERE Restaurant.cuisine_id = ?", (cuisineID,)
             )
             selectedRestaurant = self.cur.fetchall()
 
+            # open a new DisplayWindow for each selected restaurant by passing the restaurant's ID to DisplayWindow
             for i in self.restauraunts_window.getSelection:
-                DisplayWindow(
-                    self, selectedRestaurant[i][0], self.conn
-                )  # pass the restaurant's ID that was selected from the dialog to DisplayWin
+                DisplayWindow(self, selectedRestaurant[i][0], self.conn)
 
         print(f"Selected restaurant IDs in processCuisine: {selectedRestaurant}")
 
     def closeWin(self):
+        """
+        Closes the database connection and closes the program.
+        """
         self.conn.close()
         self.destroy()
         self.quit()
@@ -141,17 +149,17 @@ class DialogWindow(tk.Toplevel):
         - Displays a list of cities or cuisines for the user to select.
         - Retrieves information from the database based on the user's selection (city or cuisine).
         - Allows the user to select items from the list and returns the selected items.
-        - Provides methods to close the dialog window and communicate with the MainWindow.    
+        - Provides methods to close the dialog window and communicate with the MainWindow.
     """
 
-    def __init__(self, master, connDB):
-        super().__init__(master)
-        self.grab_set()
-        self.focus_set()
-        self.transient(master)
-        self.protocol("WM_DELETE_WINDOW", self.closeWin)
-        self._selection = ()
-        self.conn = connDB
+    def __init__(self, master, db_connection):
+        super().__init__(master)  # Need to call the constructor of the parent class
+        self.grab_set()  # Prevents user from interacting with the main window while the dialog is open
+        self.focus_set()  # Sets the focus to the dialog window
+        self.transient(master)  # Makes the dialog window dependent on the main window
+        self.protocol("WM_DELETE_WINDOW", self.closeWindow)  # Call closeWin method when user clicks on the close button
+        self._selection = ()  # Stores the user's selection
+        self.conn = db_connection  # Stores the database connection
 
     def display_cities(self):
         """
@@ -164,7 +172,7 @@ class DialogWindow(tk.Toplevel):
         """
         tk.Label(self, text="Click on a city to select", font=("Helvetica", 15)).grid(row=0, padx=15, pady=10)
 
-        # Listbox and Scrollbar
+        # Define Listbox and Scrollbar widgets
         self.listbox = tk.Listbox(self, height=6)
         self.scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.listbox.yview)
         self.listbox.configure(yscrollcommand=self.scrollbar.set)
@@ -172,15 +180,15 @@ class DialogWindow(tk.Toplevel):
         # Connect to database
         self.cur = self.conn.cursor()
 
-        # add items to the listbox
+        # Add items to the listbox from the database query
         for city in self.cur.execute("SELECT * FROM Location"):
             self.listbox.insert(tk.END, city[1])  # city[0] is city's ID
 
         self.listbox.grid(row=1, column=0, ipadx=5, padx=20, pady=20, sticky="nsew")
         self.scrollbar.grid(row=1, column=1, sticky="ns")
 
-        # Select button
-        tk.Button(self, text="Click to select", font=("Helvetica", 15), command=self.onClicked).grid(
+        # Select button that calls the on_click method
+        tk.Button(self, text="Click to select", font=("Helvetica", 15), command=self.click_select).grid(
             row=2, column=0, columnspan=2, padx=20, pady=20
         )
 
@@ -200,19 +208,17 @@ class DialogWindow(tk.Toplevel):
         self.scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.listbox.yview)
         self.listbox.configure(yscrollcommand=self.scrollbar.set)
 
-        # Connect to database
-
         self.cur = self.conn.cursor()
 
-        # add items to the listbox
+        # Add items to the listbox from the database query
         for city in self.cur.execute("SELECT * FROM Cuisine"):
-            self.listbox.insert(tk.END, city[1])  # cuisine[0] is cuisine's ID
+            self.listbox.insert(tk.END, city[1])
 
         self.listbox.grid(row=1, column=0, ipadx=5, padx=20, pady=20, sticky="nsew")
         self.scrollbar.grid(row=1, column=1, sticky="ns")
 
-        # Select button
-        tk.Button(self, text="Click to select", font=("Helvetica", 15), command=self.onClicked).grid(
+        # Select button that calls the on_click method
+        tk.Button(self, text="Click to select", font=("Helvetica", 15), command=self.click_select).grid(
             row=2, column=0, columnspan=2, padx=20, pady=20
         )
 
@@ -248,8 +254,8 @@ class DialogWindow(tk.Toplevel):
         self.listbox.grid(row=1, column=0, ipadx=5, padx=20, pady=20, sticky="nsew")
         self.scrollbar.grid(row=1, column=1, sticky="ns")
 
-        # Select button
-        tk.Button(self, text="Click to select", font=("Helvetica", 15), command=self.onClicked).grid(
+        # Select button that calls the select method, which closes the dialog window
+        tk.Button(self, text="Click to select", font=("Helvetica", 15), command=self.click_select).grid(
             row=2, column=0, columnspan=2, padx=20, pady=20
         )
 
@@ -269,39 +275,41 @@ class DialogWindow(tk.Toplevel):
         self.scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.listbox.yview)
         self.listbox.configure(yscrollcommand=self.scrollbar.set)
 
-        # Connect to database
+        self.cur = self.conn.cursor()  # Connect to database
 
-        self.cur = self.conn.cursor()
-
-        # self.cur.execute("SELECT Main.name FROM Main WHERE Main.kind = ?",(cuisineID,))
+        # Find all the restaurants that match the selected cuisine ID
         self.cur.execute(
             "SELECT Restaurant.restaurant_name FROM Restaurant WHERE Restaurant.cuisine_id = ?", (cuisineID,)
         )
-
+        # Fetch all the restaurants from the query
         restaurants = self.cur.fetchall()
-        print(f"Restaurants with cuisine {cuisineID}: {restaurants}")  # Debug print
 
+        # Loop used to add restaurants to the listbox
         for restaurant in restaurants:
             self.listbox.insert(tk.END, restaurant[0])
 
+        # Add the listbox and scrollbar to the dialog window
         self.listbox.grid(row=1, column=0, ipadx=5, padx=20, pady=20, sticky="nsew")
         self.scrollbar.grid(row=1, column=1, sticky="ns")
 
-        # Select button
-        tk.Button(self, text="Click to select", font=("Helvetica", 15), command=self.onClicked).grid(
+        # Select button that calls the on_click method, which closes the dialog window
+        tk.Button(self, text="Click to select", font=("Helvetica", 15), command=self.click_select).grid(
             row=2, column=0, columnspan=2, padx=20, pady=20
         )
 
-    def onClicked(self):
+    def click_select(self):
+        """
+        Retrieves the user's selection from the listbox and closes the dialog window.
+        """
         self._selection = self.listbox.curselection()
-        self.closeWin()
+        self.closeWindow()
 
-    @property
+    @property  # @property decorator allows the method to be called without parentheses
     def getSelection(self):
         return self._selection
 
-    def closeWin(self):
-        self.destroy()
+    def closeWindow(self):
+        self.destroy() # Close the dialog window without closing the main window
 
 
 class DisplayWindow(tk.Toplevel):
@@ -313,45 +321,47 @@ class DisplayWindow(tk.Toplevel):
         - Provides a method to open the restaurant's webpage in a web browser.
     """
 
-    def __init__(self, master, restaurantID, connDB):
+    # Call the constructor of the parent class, passing the current instance of MainWindow, the restaurant's ID, and the database connection
+    def __init__(self, master, restaurant_ID, db_connection):
         super().__init__(master)
-        self.transient(master)
+        self.transient(
+            master
+        )  # .transient() makes the dialog window dependent on the main window (it will close when the main window is closed)
 
-        # Connect to database
-        self.conn = connDB
-        self.cur = self.conn.cursor()
+        self.conn = db_connection  # Connect to database
+        self.cur = self.conn.cursor()  # Create cursor object
 
-        self.cur.execute("SELECT * FROM Restaurant WHERE Restaurant.restaurant_id = ?", (restaurantID,))
+        # Get the restaurant's details from the database based on the restaurant's ID
+        self.cur.execute("SELECT * FROM Restaurant WHERE Restaurant.restaurant_id = ?", (restaurant_ID,))
         restaurant = self.cur.fetchone()
-
-        print(f"Fetched restaurant details: {restaurant}")
-
         name, address = restaurant[1], restaurant[6]
 
+        # Get the restaurant's cost and cuisine from the database based on the restaurant's ID
         self.cur.execute(
             "SELECT Cost.cost_symbol FROM Restaurant JOIN Cost ON Restaurant.cost_id = Cost.cost_id AND Restaurant.restaurant_id = ?",
-            (restaurantID,),
+            (restaurant_ID,),
         )
         cost = self.cur.fetchone()[0]
 
+        # Get the restaurant's cuisine from the database based on the restaurant's ID
         self.cur.execute(
             "SELECT Cuisine.cuisine_name FROM Restaurant JOIN Cuisine ON Restaurant.cuisine_id = Cuisine.cuisine_id AND Restaurant.restaurant_id = ?",
-            (restaurantID,),
+            (restaurant_ID,),
         )
         cuisine = self.cur.fetchone()[0]
 
+        # Get the restaurant's URL
         url = restaurant[2]
 
-        tk.Label(self, text=name, font=("Helvetica", 15), fg="blue").pack(padx=15, pady=10)
-        tk.Label(self, text=address, font=("Helvetica", 15)).pack(padx=15, pady=10)
-        tk.Label(self, text=f"Cost: {cost}", font=("Helvetica", 15)).pack(padx=15, pady=10)
-        tk.Label(self, text=f"Cuisine: {cuisine}", font=("Helvetica", 15), fg="blue").pack(padx=15, pady=10)
+        tk.Label(self, text=name, font=("Helvetica", 18), fg="blue").grid(row=0, padx=15, pady=10)
+        tk.Label(self, text=address, font=("Helvetica", 15)).grid(row=1, padx=15, pady=10)
+        tk.Label(self, text=f"Cost: {cost}", font=("Helvetica", 15)).grid(row=2, padx=15, pady=10)
+        tk.Label(self, text=f"Cuisine: {cuisine}", font=("Helvetica", 15), fg="blue").grid(row=3, padx=15, pady=10)
+
+        # Add a button to open the restaurant's webpage in a web browser using the webbrowser module
         tk.Button(
             self, text="Visit Webpage", font=("Helvetica", 15), fg="blue", command=lambda: webbrowser.open_new(url)
-        ).pack(padx=15, pady=10)
-
-        # self.conn.close()
-        print(f"restaurantID in DisplayWin: {restaurantID}")
+        ).grid(row=4, padx=15, pady=10)
 
 
 if __name__ == "__main__":

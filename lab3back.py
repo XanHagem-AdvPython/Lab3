@@ -7,32 +7,21 @@ Lab 3: Web Scraping and Database Interaction
 
 lab3back.py
 
-    This script is the back end component of the program, responsible for scraping data from the Michelin Guide website 
-    to gather information about local restaurants.
-    It performs web crawling, extraction, and data processing to create JSON files and an SQLite database for further analysis.
-
-Two distinct parts: Part A and Part B. 
-    - Only one part will run at a time. 
-    - After finishing Part A, comment it out and write Part B.
- 
-    webpage ===> Part A ===> JSON file  
-    JSON file ===> Part B ===> SQL Database 
+    Back end component of the program, 
+    Scrapes restauraunt data from the Michelin Guide website, and saves to json and sqlite database files.
 
 PART A: Web Scraping
 
-    - Scrape data from the Michelin Guide page for restaurants in San Jose.
-    - Extract information such as URL, name, location, cost, and cuisine.
-    - Crawl to individual restaurant pages to extract additional information like address.
-    - Organize the web scraping code using OOP or functions.
-    - Store the extracted data in a JSON file.
+    - Scrapes data from the Michelin Guide page for restaurants in San Jose and/or Cupertino.
+    - Extracts the URL, name, location, cost, and cuisine.
+    - Crawls to individual restaurant pages to extract address.
+    - Store the extracted data in a JSON file
 
-PART B: Data Storage
+PART B: Database with SQLite
 
-    - Enhance the web scraping code to scrape data from the Michelin Guide page for restaurants in Cupertino.
-    - Create JSON files for both San Jose and Cupertino restaurants.
-    - Read the data from the JSON files and store it in an SQLite database.
     - Design the database with tables for locations, costs, cuisines, and the main table for restaurant attributes.
-
+    - Read the data from the JSON files and store it in an SQLite database.
+    - Insert the data into the database (ref db design).
 """
 
 import requests
@@ -40,6 +29,12 @@ from bs4 import BeautifulSoup
 import json
 import sqlite3
 from collections import defaultdict
+
+# URLs to scrape data from
+URL_DICT = {
+    "San Jose": "https://guide.michelin.com/us/en/california/san-jose/restaurants",
+    "Cupertino": "https://guide.michelin.com/us/en/california/cupertino/restaurants",
+}
 
 
 def fetch_restaurants_directory_data(url):
@@ -62,10 +57,10 @@ def fetch_restaurants_directory_data(url):
     while url:
         # Get the page content and create a beautiful soup object
         try:
-            page = requests.get(url)  # TODO: try-exception block    
+            page = requests.get(url)  # TODO: try-exception block
         except:
             return False
-        
+
         soup = BeautifulSoup(page.content, "lxml")
 
         # Get the restaurant cards
@@ -156,14 +151,14 @@ def create_database():
     - Cuisine type (lookup table), int : type
     - Addess (street address and city)
 
-    PARAM:
     RETURN: the database connection (type: sqlite3.connect??)
     """
-    # Connect to the database
-    conn = sqlite3.connect("restaurants.db")
+    conn = sqlite3.connect("restaurants.db")  # Connect to the database
     cursor = conn.cursor()
 
-    ## Create the tables needed for the database
+    # -------------------------------------------#
+    # Create the tables needed for the database #
+    # -------------------------------------------#
 
     # Create the "Cuisine" lookup table
     cursor.execute(
@@ -210,11 +205,9 @@ def create_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cost_id ON Restaurant (cost_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_location_id ON Restaurant (location_id)")
 
-    # Commit the changes to the database
-    conn.commit()
+    conn.commit()  # Commit the changes to the database
 
-    # Return the database connection
-    return conn
+    return conn  # Return the database connection
 
 
 def insert_into_database(conn, dict_list):
@@ -224,8 +217,7 @@ def insert_into_database(conn, dict_list):
     PARAM: conn - the database connection
     PARAM: dict_list - the data to insert into the database
     """
-    # Get the cursor
-    cursor = conn.cursor()
+    cursor = conn.cursor()  # Get the cursor
 
     # Insert into the database in the order that respects the foreign key constraints
     for row in dict_list:
@@ -237,19 +229,20 @@ def insert_into_database(conn, dict_list):
         location_name = row["location"]
         street_address = row["address"]
 
-        # Insert the data into the "Cuisine" table
+        # Insert the data into the "Cuisine" table, using INSERT OR IGNORE to avoid duplicate entries
         cursor.execute(
             "INSERT OR IGNORE INTO Cuisine (cuisine_name) VALUES (?)",
             (cuisine_name,),
         )
         cursor.execute("SELECT cuisine_id FROM Cuisine WHERE cuisine_name = ?", (cuisine_name,))
-        cuisine_id = cursor.fetchone()[0]
+        cuisine_id = cursor.fetchone()[0]  # Use fetchone() to get the id of the last inserted row
 
-        # Insert the data into the "Cost" table
+        # Insert the data into the "Cost" table using INSERT OR IGNORE to avoid duplicate entries
         cursor.execute(
             "INSERT OR IGNORE INTO Cost (cost_symbol) VALUES (?)",
             (cost_symbol,),
         )
+        # Get the id of the last inserted row to use as the foreign key for the "Restaurant" table
         cursor.execute("SELECT cost_id FROM Cost WHERE cost_symbol = ?", (cost_symbol,))
         cost_id = cursor.fetchone()[0]
 
@@ -261,15 +254,18 @@ def insert_into_database(conn, dict_list):
         cursor.execute("SELECT location_id FROM Location WHERE location_name = ?", (location_name,))
         location_id = cursor.fetchone()[0]
 
-        # Insert the data into the "Restaurant" table
+        # Insert the data into the "Restaurant" table using INSERT OR IGNORE to avoid duplicate entries
         cursor.execute(
             "INSERT OR IGNORE INTO Restaurant (restaurant_name, restaurant_url, cuisine_id, cost_id, location_id, street_address) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (restaurant_name, restaurant_url, cuisine_id, cost_id, location_id, street_address),
         )
 
-    # Commit the changes to the database
-    conn.commit()
+    conn.commit()  # Commit the changes to the database
+
+
+# UNIT TESTING #
+
 
 def view_database(conn):
     """
@@ -277,6 +273,9 @@ def view_database(conn):
 
     PARAM: conn - the database connection
     """
+
+    print("\n *** Viewing the database *** \n")
+
     # Get the cursor
     cursor = conn.cursor()
 
@@ -306,6 +305,9 @@ def view_decoded_database(conn):
 
     PARAM: conn - the database connection
     """
+    
+    print("\n *** Viewing DECODED database *** \n")
+    
     # Get the cursor
     cursor = conn.cursor()
 
@@ -328,72 +330,144 @@ def view_decoded_database(conn):
         print(f"Row {index}: {row}")
 
 
+def test_partA_without_duplicates():
+    print(
+        """
+        ---------------------------------------------------------
+        |       Running part A (without dupicates in dict)       |
+        ---------------------------------------------------------
+    """
+    )
+
+    # Get the restaurant data from both cities
+    restaurants = []
+
+    # VERSION 1: skip duplicate dict entries (NOTE this is also handled elsewhere)
+
+    restaurants.extend(r for r in fetch_restaurants_directory_data(URL_DICT["San Jose"]) if r not in restaurants)
+    restaurants.extend(r for r in fetch_restaurants_directory_data(URL_DICT["Cupertino"]) if r not in restaurants)
+
+    # Now, use the restaurant urls to get the restaurant street addresses, and add to dictionary
+    for restaurant in restaurants:
+        restaurant["address"] = extract_restaurant_address(restaurant["url"])
+
+    # Now, write the data to a JSON file using the write_to_json_file() function
+    write_to_json_file(restaurants, "restaurants.json")
+
+
+def test_partA_with_duplicates():
+    print(
+        """
+        ---------------------------------------------------------
+        |       Running part A (WITH dupicates in dict   )       |
+        ---------------------------------------------------------
+    """
+    )
+
+    # Get the restaurant data from both cities
+    restaurants = []
+
+    # VERSION 2: get all restaurants, including duplicates to test db insertion
+    for url in URL_DICT.values():
+        restaurants.extend(fetch_restaurants_directory_data(url))
+
+    # Now, use the restaurant urls to get the restaurant street addresses, and add to dictionary
+    for restaurant in restaurants:
+        restaurant["address"] = extract_restaurant_address(restaurant["url"])
+
+    # Now, write the data to a JSON file using the write_to_json_file() function
+    write_to_json_file(restaurants, "restaurants.json")
+
+
+def test_partB():
+    print(
+        """
+        ---------------------------------------------------------
+        |       Running part B (writing to & reading from db)   |
+        ---------------------------------------------------------
+        """
+    )
+
+    # read the data from the JSON file
+    with open("restaurants.json", "r") as file:
+        restaurants_from_json = json.load(file)
+
+    print(f"Number of restaurants: {len(restaurants_from_json)}")
+
+    # Call the create_database() function to create the database and get the connection
+    conn = create_database()
+
+    # Call the insert_into_database() function to insert the data into the database
+    insert_into_database(conn, restaurants_from_json)
+
+    # # Call the view_database() function to view the contents of the database
+    print("\n *** View the database *** \n")
+    view_database(conn)
+
+    # # Call the view_decoded_database() function to view the contents of the database
+    print("\n *** View the DECODED database *** \n")
+    view_decoded_database(conn)
+
+
 def main():
     """
     Main function (testing)
+    Does both part A and part B, but need to comment out
+    NOTE: uses pages for both San Jose and Cupertino
     """
     print(
         """"
-        ----------------------
-        |   Running main...   |
-        ----------------------
+        --------------------------------
+        |       Running main...        |
+        --------------------------------
     """
     )
-    # URLs to scrape data from
-    urls = {
-        "San Jose": "https://guide.michelin.com/us/en/california/san-jose/restaurants",
-        "Cupertino": "https://guide.michelin.com/us/en/california/cupertino/restaurants",
-    }
 
-    sj_restaurants = fetch_restaurants_directory_data(urls["San Jose"])
-    cp_restaurants = fetch_restaurants_directory_data(urls["Cupertino"])
+    print("\n ***** TESTING PART A: Scraping & writing to json ***** \b")
 
-    part_A = False
+    # Get the restaurant data from both cities
+    restaurants = []
 
-    if part_A:
-        print("\n ***** TESTING PART A: Scraping & writing to json ***** \b")
+    # VERSION 1: skip duplicate dict entries (NOTE this is also handled in db insertion)
+    restaurants.extend(r for r in fetch_restaurants_directory_data(URL_DICT["San Jose"]) if r not in restaurants)
+    restaurants.extend(r for r in fetch_restaurants_directory_data(URL_DICT["Cupertino"]) if r not in restaurants)
 
-        # get the restaurant data from both cities, skipping duplicates
-        restaurants = []
-        restaurants.extend(r for r in fetch_restaurants_directory_data(urls["San Jose"]) if r not in restaurants)
-        restaurants.extend(r for r in fetch_restaurants_directory_data(urls["Cupertino"]) if r not in restaurants)
+    # # VERSION 2: get all restaurants, including duplicates to test db insertion
+    # for url in URL_DICT.values():
+    #     restaurants.extend(fetch_restaurants_directory_data(url))
 
-        # Now, use the restaurant urls to get the restaurant street addresses, and add to dictionary
-        for restaurant in restaurants:
-            restaurant["address"] = extract_restaurant_address(restaurant["url"])
+    # Use the restaurant urls to get the restaurant street addresses, and add to dictionary
+    for restaurant in restaurants:
+        restaurant["address"] = extract_restaurant_address(restaurant["url"])
 
-        # print the restaurant data
-        for restaurant in sorted(restaurants, key=lambda x: x["name"]):
-            for key, value in restaurant.items():
-                print(f"{key}: {value}")
-            print("\n")
+    # Now, write the data to a JSON file using the write_to_json_file() function
+    write_to_json_file(restaurants, "restaurants.json")
 
-        # Now, write the data to a JSON file using the write_to_json_file() function
-        write_to_json_file(restaurants, "restaurants.json")
+    print("\n ***** TESTING PART B: writing to & reading from db ***** \n")
 
-    if not part_A:
-        print("\n ***** TESTING PART B: writing to & reading from db ***** \n")
+    # read the data from the JSON file
+    with open("restaurants.json", "r") as file:
+        restaurants_from_json = json.load(file)
 
-        # read the data from the JSON file
-        with open("restaurants.json", "r") as file:
-            restaurants_from_json = json.load(file)
+    print(f"Number of restaurants: {len(restaurants_from_json)}")
 
-        print(f"Number of restaurants: {len(restaurants_from_json)}")
+    # Call the create_database() function to create the database and get the connection
+    conn = create_database()
 
-        # Call the create_database() function to create the database and get the connection
-        conn = create_database()
+    # Call the insert_into_database() function to insert the data into the database
+    insert_into_database(conn, restaurants_from_json)
 
-        # Call the insert_into_database() function to insert the data into the database
-        insert_into_database(conn, restaurants_from_json)
+    # Call the view_database() function to view the contents of the database
+    view_database(conn)
 
-        # # Call the view_database() function to view the contents of the database
-        print("\n *** View the database *** \n")
-        view_database(conn)
-
-        # # Call the view_decoded_database() function to view the contents of the database
-        print("\n *** View the DECODED database *** \n")
-        view_decoded_database(conn)  # FIXME: NOT WORKING! ONLY PRINTING FIRST SIX ROWS
+    # Call the view_decoded_database() function to view the contents of the database
+    view_decoded_database(conn)
 
 
 if __name__ == "__main__":
-    main()
+
+    main() # Runs both parts A and B
+
+    # test_partA_without_duplicates()
+    # test_partA_with_duplicates()
+    # test_partB()
